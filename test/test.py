@@ -1,4 +1,14 @@
 import os
+import sys
+from typing import List, Dict, Any, Optional
+
+# Ensure we can import project modules from the `src` folder
+REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+SRC_PATH = os.path.join(REPO_ROOT, "src")
+if SRC_PATH not in sys.path:
+    sys.path.insert(0, SRC_PATH)
+
+import os
 import graph
 import recommend as rec
 
@@ -13,12 +23,12 @@ graph.validate_graph(G)
 
 # pick a user (first user node)
 user_node = next(n for n, d in G.nodes(data=True) if d.get("bipartite") == "user")
-top = rec.recommend_for_user(G, mappings, ratings_df, movies_df, user_node, top_n=10, use_rwr=True)
+top = rec.recommend_for_user(G, mappings, ratings_df, movies_df, user_node, top_n=10)
 
 print(f"Top recommendations for {user_node}:")
 for i, r in enumerate(top, start=1):
 	title = r.get("title") or r["movie_node"]
 	mid = r.get("movie_id")
 	print(
-		f"{i}. {title} (id={mid}): jaccard={r['jaccard']:.4f}, rwr={r['rwr_prob']:.6f}, common2={r['common_2hop']}, avg_rating_similar={r['avg_rating_similar']}"
+		f"{i}. {title} (id={mid}): jaccard={r['jaccard']:.4f}, common2={r['common_2hop']}, avg_rating={r.get('avg_rating')}"
 	)

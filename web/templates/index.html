@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Movie Recommendations</title>
+    <style>
+      body { font-family: Arial, sans-serif; margin: 20px; }
+      table { border-collapse: collapse; width: 100%; }
+      th, td { border: 1px solid #ddd; padding: 8px; }
+      th { background: #f4f4f4; }
+      label { display:block; margin-bottom:6px; }
+      select, input { padding:6px; }
+    </style>
+  </head>
+  <body>
+    <h1>Movie Recommendations</h1>
+
+    <form method="post" action="/recommend">
+      <div>
+        <label for="liked_movies">Select movies you like (multi-select):</label>
+        <select name="liked_movies" id="liked_movies" multiple size="12" style="width:60%">
+          {% for mid, title in movies %}
+            <option value="{{ mid }}">{{ title }} (id={{ mid }})</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div style="margin-top:8px;">
+        <label for="top_n">Number of recommendations:</label>
+        <input type="number" name="top_n" id="top_n" value="10" min="1" max="100">
+      </div>
+
+      <div style="margin-top:8px;">
+        <label for="genre">Genre filter:</label>
+        <select name="genre" id="genre">
+          {% for g in genres %}
+            <option value="{{ g }}">{{ g }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div style="margin-top:12px;">
+        <button type="submit">Get recommendations</button>
+      </div>
+    </form>
+
+    {% if results is not none %}
+      <h2 style="margin-top:20px;">Results</h2>
+      {% if results %}
+        <table>
+          <thead>
+            <tr>
+              <th>Rank</th>
+              <th>Title</th>
+              <th>Score (Jaccard)</th>
+              <th>Score (Common Neighbors)</th>
+              <th>Genres</th>
+              <th>Avg rating (supporters)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in results %}
+              <tr>
+                <td>{{ loop.index }}</td>
+                <td>{{ r.title }}</td>
+                <td>{{ "%.4f"|format(r.get('jaccard', 0.0)) }}</td>
+                  <td>{{ r.get('common_2hop', 0) }}</td>
+                <td>{{ r.get('genres') }}</td>
+                <td>{{ r.get('avg_rating') }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% else %}
+        <p>No recommendations (no input or no matches).</p>
+      {% endif %}
+    {% endif %}
+
+  </body>
+</html>
