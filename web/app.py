@@ -2,7 +2,7 @@ import os
 import sys
 from typing import List, Dict, Any, Optional
 
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, session
 
 # Ensure we can import project modules from the `src` folder
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -12,9 +12,12 @@ if SRC_PATH not in sys.path:
 
 import graph as graph_mod
 import scoring as scoring_mod
+import graphvis
 import networkx as nx
 
 app = Flask(__name__)
+# Use environment variable for secret key in production
+app.secret_key = os.environ.get('SECRET_KEY', 'dev_key_change_in_production')
 
 
 # Load data and build graph once at startup
@@ -24,8 +27,8 @@ MOVIES_PATH = os.path.join(REPO_ROOT, "res", "movies.csv")
 # Load CSVs
 RATINGS_DF, MOVIES_DF = graph_mod.load_data(RATINGS_PATH, MOVIES_PATH)
 
-# Optionally downsample to keep web app responsive
-RATINGS_FILTERED = graph_mod.downsample_users(RATINGS_DF, min_likes=10, threshold=3.5, sample_n=500)
+# Use all users (no downsampling)
+RATINGS_FILTERED = graph_mod.downsample_users(RATINGS_DF, min_likes=10, threshold=3.5, sample_n=None)
 
 # Build bipartite graph and mappings
 G, MAPPINGS = graph_mod.build_bipartite_graph(RATINGS_FILTERED, MOVIES_DF, threshold=3.5)
@@ -104,7 +107,15 @@ def get_recommendations_for_user_node(user_node: str, top_n: int = 10, genre_fil
     return results[:top_n]
 
 
-def get_recommendations_for_liked_movies(liked_movie_ids: List[int], top_n: int = 10, genre_filter: Optional[str] = None) -> List[Dict[str, Any]]:
+# Recommend movies for a given user node or liked movies
+def get_recommendations_for_liked_movies(
+    liked_movie_ids: List[int], 
+    top_n: int = 10, 
+    genre_filter: Optional[str] = None,
+    rating_limit: float = 0.0,
+    algorithm: str = "jaccard",
+    prioritize_rating: bool = False
+) -> List[Dict[str, Any]]:
     # Build union of likers for selected movies
     selected_movie_nodes = [f"m_{mid}" for mid in liked_movie_ids if f"m_{mid}" in MOVIE_NODES]
     user_set = set()
@@ -116,24 +127,29 @@ def get_recommendations_for_liked_movies(liked_movie_ids: List[int], top_n: int 
     # Candidate movies exclude the selected ones
     candidates = [m for m in MOVIE_NODES if m not in selected_movie_nodes]
     results = []
+    
     for m in candidates:
-        # genre filter
+        # Genre filter
         if genre_filter and genre_filter != "All":
             genres = G.nodes[m].get("genres")
             if not genres or genre_filter not in str(genres):
                 continue
 
-        # likers of candidate
+        # Likers of candidate
         likers = set(get_likers_of_movie_node(m))
 
-        # compute Jaccard between user_set and likers
+        # Compute score based on algorithm
         intersection = user_set.intersection(likers)
         union = user_set.union(likers)
-        jacc = 0.0
-        if len(union) > 0:
-            jacc = len(intersection) / len(union)
+        
+        if algorithm == "cn":
+            # Common neighbors
+            score = len(intersection)
+        else:
+            # Jaccard (default)
+            score = len(intersection) / len(union) if len(union) > 0 else 0.0
 
-        # average rating among intersection
+        # Average rating among intersection
         avg_rating = None
         if intersection:
             supporter_ids = [MAPPINGS["node_to_user_id"].get(u) for u in intersection]
@@ -143,35 +159,41 @@ def get_recommendations_for_liked_movies(liked_movie_ids: List[int], top_n: int 
                 if not rows.empty:
                     avg_rating = float(rows["rating"].mean())
 
-        # Ensure result dict includes same keys as user-based recommendations
+        # Apply rating limit filter
+        if avg_rating is not None and avg_rating < rating_limit:
+            continue
+
+        # Apply rating weight if prioritize_rating is True
+        final_score = score
+        if prioritize_rating and avg_rating is not None:
+            # Weight score by normalized rating (0-1 scale)
+            rating_weight = avg_rating / 5.0
+            final_score = score * rating_weight
+
         results.append({
             "movie_node": m,
             "movie_id": MAPPINGS["node_to_movie_id"].get(m),
             "title": G.nodes[m].get("title"),
             "genres": G.nodes[m].get("genres"),
-            "jaccard": jacc,
+            "jaccard": score if algorithm == "jaccard" else None,
             "common_2hop": len(intersection),
             "avg_rating": avg_rating,
+            "score": final_score
         })
 
-    # sort by jaccard desc
-    results.sort(key=lambda x: -x["jaccard"])
+    # Sort by final score descending
+    results.sort(key=lambda x: -x["score"])
     return results[:top_n]
 
 
 @app.route("/", methods=["GET"])
 def index():
-    # Provide simple lists for form selects; movies list uses (id, title)
+    # Provide movie list
     movie_options = []
     for m in MOVIE_NODES:
         mid = MAPPINGS["node_to_movie_id"].get(m)
         title = G.nodes[m].get("title")
         movie_options.append((mid, title))
-
-    user_options = []
-    for u in USER_NODES:
-        uid = MAPPINGS["node_to_user_id"].get(u)
-        user_options.append(uid)
 
     # Simple genre list (collect a few from movies_df)
     genres = ["All"]
@@ -184,46 +206,86 @@ def index():
                 gset.add(p)
         genres.extend(sorted(gset))
 
-    return render_template("index.html", users=user_options, movies=movie_options, genres=genres, results=None)
+    # Restore liked movies from session if returning from results/graph page
+    liked_movies_from_session = session.get('liked_movies', [])
+    
+    return render_template("index.html", movies=movie_options, genres=genres, 
+                         results=None, liked_movies=liked_movies_from_session)
 
 
-@app.route("/recommend", methods=["POST"])
+@app.route("/recommend", methods=["GET", "POST"])
 def recommend():
-    # Read form values
-    user_id = request.form.get("user_id")
-    top_n = int(request.form.get("top_n", 10))
-    genre = request.form.get("genre", "All")
+    if request.method == "POST":
+        # Read form values
+        top_n = int(request.form.get("top_n", 10))
+        genre = request.form.get("genre", "All")
+        rating_limit = float(request.form.get("rating_limit", 0.0))
+        algorithm = request.form.get("algorithm", "jaccard")
+        # Checkbox returns "yes" if checked, None if unchecked
+        prioritize_rating = request.form.get("prioritize_rating") == "yes"
+        
+        # Get liked movies from comma-separated string
+        liked_movies_str = request.form.get("liked_movies", "")
+        liked_movie_ids = []
+        if liked_movies_str:
+            liked_movie_ids = [int(x.strip()) for x in liked_movies_str.split(",") if x.strip()]
 
-    # Multi-select liked movies comes as list of strings of numeric ids
-    liked = request.form.getlist("liked_movies")
-    liked_movie_ids = [int(x) for x in liked if x]
+        # Store in session for graph visualization and back navigation
+        session['liked_movies'] = liked_movie_ids
+        session['top_n'] = top_n
+        session['genre'] = genre
+        session['rating_limit'] = rating_limit
+        session['algorithm'] = algorithm
+        session['prioritize_rating'] = prioritize_rating
 
-    results = None
-    if user_id:
-        try:
-            user_node = f"u_{int(user_id)}"
-            results = get_recommendations_for_user_node(user_node, top_n=top_n, genre_filter=genre)
-        except Exception as e:
-            results = []
-    elif liked_movie_ids:
-        results = get_recommendations_for_liked_movies(liked_movie_ids, top_n=top_n, genre_filter=genre)
-    else:
         results = []
+        if liked_movie_ids:
+            results = get_recommendations_for_liked_movies(
+                liked_movie_ids, 
+                top_n=top_n, 
+                genre_filter=genre,
+                rating_limit=rating_limit,
+                algorithm=algorithm,
+                prioritize_rating=prioritize_rating
+            )
+        
+        # Store results in session for graph page
+        session['results'] = results
 
-    # Render same index template with results
-    movie_options = [(MAPPINGS["node_to_movie_id"].get(m), G.nodes[m].get("title")) for m in MOVIE_NODES]
-    user_options = [MAPPINGS["node_to_user_id"].get(u) for u in USER_NODES]
-    genres = ["All"]
-    if MOVIES_DF is not None and "genres" in MOVIES_DF.columns:
-        gset = set()
-        for val in MOVIES_DF["genres"].dropna().unique():
-            parts = str(val).split("|")
-            for p in parts:
-                gset.add(p)
-        genres.extend(sorted(gset))
+        # Render recommendations page
+        return render_template("recommendations.html", results=results)
+    
+    else:  # GET request - retrieve from session
+        results = session.get('results', [])
+        if not results:
+            # No session data, redirect to home
+            return render_template("recommendations.html", results=[], error="No recommendations found. Please select movies first.")
+        
+        return render_template("recommendations.html", results=results)
 
-    return render_template("index.html", users=user_options, movies=movie_options, genres=genres, results=results)
+
+@app.route("/graph", methods=["GET"])
+def graph():
+    # Get data from session
+    liked_movie_ids = session.get('liked_movies', [])
+    results = session.get('results', [])
+    
+    if not liked_movie_ids or not results:
+        return render_template("graph.html", error="No recommendation data found. Please generate recommendations first.")
+    
+    # Generate interactive graph
+    fig, similar_users_details = graphvis.create_bipartite_graph(
+        G, MAPPINGS, MOVIES_DF, liked_movie_ids, results, top_n_similar=5
+    )
+    
+    # Convert to HTML
+    graph_html = fig.to_html(full_html=False, include_plotlyjs='cdn')
+    
+    return render_template("graph.html", graph_html=graph_html, similar_users=similar_users_details)
 
 
 if __name__ == "__main__":
-    app.run(debug=True, port=5000)
+    # Debug mode should be False in production
+    app.run(debug=os.environ.get('FLASK_DEBUG', 'False') == 'True', 
+            host='0.0.0.0',
+            port=int(os.environ.get('PORT', 5000)))

@@ -1,2 +1,10 @@
 # NetflixRecommendation
 Netflix Recommendation Graph
+
+```md
+Flask>=3.0.0
+pandas>=2.0.0
+networkx>=2.8.0
+plotly>=5.0.0
+python-dotenv>=1.0.0
+```

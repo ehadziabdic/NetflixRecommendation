@@ -3,79 +3,150 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Movie Recommendations</title>
-    <style>
-      body { font-family: Arial, sans-serif; margin: 20px; }
-      table { border-collapse: collapse; width: 100%; }
-      th, td { border: 1px solid #ddd; padding: 8px; }
-      th { background: #f4f4f4; }
-      label { display:block; margin-bottom:6px; }
-      select, input { padding:6px; }
-    </style>
+    <title>Netflix Movie Recommender</title>
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='icons/favicon.png') }}?v=2">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
   </head>
   <body>
-    <h1>Movie Recommendations</h1>
+    <h1>Netflix Movie Recommender</h1>
 
-    <form method="post" action="/recommend">
-      <div>
-        <label for="liked_movies">Select movies you like (multi-select):</label>
-        <select name="liked_movies" id="liked_movies" multiple size="12" style="width:60%">
-          {% for mid, title in movies %}
-            <option value="{{ mid }}">{{ title }} (id={{ mid }})</option>
-          {% endfor %}
-        </select>
-      </div>
+    <div class="container">
+      <!-- Left Column - Movie Selection -->
+      <div class="left-column">
+        <!-- Search Bar -->
+        <div class="search-container">
+          <input 
+            type="text" 
+            id="search-input" 
+            class="search-input" 
+            placeholder="Search for movie..."
+          >
+          <i class="fa-solid fa-magnifying-glass search-icon"></i>
+        </div>
 
-      <div style="margin-top:8px;">
-        <label for="top_n">Number of recommendations:</label>
-        <input type="number" name="top_n" id="top_n" value="10" min="1" max="100">
-      </div>
-
-      <div style="margin-top:8px;">
-        <label for="genre">Genre filter:</label>
-        <select name="genre" id="genre">
-          {% for g in genres %}
-            <option value="{{ g }}">{{ g }}</option>
-          {% endfor %}
-        </select>
-      </div>
-
-      <div style="margin-top:12px;">
-        <button type="submit">Get recommendations</button>
-      </div>
-    </form>
-
-    {% if results is not none %}
-      <h2 style="margin-top:20px;">Results</h2>
-      {% if results %}
-        <table>
-          <thead>
-            <tr>
-              <th>Rank</th>
-              <th>Title</th>
-              <th>Score (Jaccard)</th>
-              <th>Score (Common Neighbors)</th>
-              <th>Genres</th>
-              <th>Avg rating (supporters)</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for r in results %}
-              <tr>
-                <td>{{ loop.index }}</td>
-                <td>{{ r.title }}</td>
-                <td>{{ "%.4f"|format(r.get('jaccard', 0.0)) }}</td>
-                  <td>{{ r.get('common_2hop', 0) }}</td>
-                <td>{{ r.get('genres') }}</td>
-                <td>{{ r.get('avg_rating') }}</td>
-              </tr>
+        <!-- Movie List -->
+        <div class="movie-list-container">
+          <h3>All Movies</h3>
+          <div id="movie-list" class="movie-list">
+            {% for mid, title in movies %}
+              <div class="movie-item" data-movie-id="{{ mid }}" data-movie-title="{{ title }}">
+                <span class="movie-title">{{ title }}</span>
+                <button type="button" class="heart-btn unliked"><i class="fa-regular fa-heart"></i></button>
+              </div>
             {% endfor %}
-          </tbody>
-        </table>
-      {% else %}
-        <p>No recommendations (no input or no matches).</p>
-      {% endif %}
-    {% endif %}
+          </div>
+        </div>
 
+        <!-- Your Movies -->
+        <div class="your-movies-container">
+          <h2>Your Movies</h2>
+          <div id="your-movies-list" class="your-movies-list">
+            <div class="empty-message">List of movies liked by user currently</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Column - Controls and Results -->
+      <div class="right-column">
+        <!-- Controls -->
+        <div class="controls-section">
+          <form id="recommend-form" method="post" action="/recommend">
+            <!-- Hidden input for liked movies (for form submission) -->
+            <input type="hidden" id="liked-movies-input" name="liked_movies" value="">
+            <!-- Hidden input for restoring liked movies from session -->
+            <input type="hidden" id="liked-movies-data" value="{% if liked_movies %}{{ liked_movies|join(',') }}{% endif %}">
+
+            <!-- Top N Recommendations -->
+            <div class="control-group">
+              <label class="control-label">Top # Recommendations</label>
+              <input 
+                type="number" 
+                name="top_n" 
+                class="number-input" 
+                value="10" 
+                min="1" 
+                max="100"
+              >
+            </div>
+
+            <!-- Genre -->
+            <div class="control-group">
+              <label class="control-label">Genre</label>
+              <select name="genre" class="dropdown">
+                {% for g in genres %}
+                  <option value="{{ g }}">{{ g }}</option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <!-- Rating Limit -->
+            <div class="control-group">
+              <label class="control-label">Rating Limit</label>
+              <div class="slider-container">
+                <span class="slider-value">0</span>
+                <input 
+                  type="range" 
+                  id="rating-slider"
+                  name="rating_limit"
+                  class="slider" 
+                  min="0" 
+                  max="5" 
+                  step="0.1" 
+                  value="0"
+                >
+                <span class="slider-value" id="slider-value">5</span>
+              </div>
+            </div>
+
+            <!-- Switch Algorithm -->
+            <div class="control-group">
+              <label class="control-label">Switch Algorithm</label>
+              <div class="toggle-group">
+                <button 
+                  type="button" 
+                  class="toggle-btn algorithm-btn active" 
+                  data-value="jaccard"
+                >
+                  Jaccard
+                </button>
+                <button 
+                  type="button" 
+                  class="toggle-btn algorithm-btn" 
+                  data-value="cn"
+                >
+                  Common Neighbors
+                </button>
+              </div>
+              <input type="hidden" name="algorithm" id="algorithm-input" value="jaccard">
+            </div>
+
+            <!-- Prioritize Rating -->
+            <div class="control-group">
+              <label class="control-label">Prioritize Rating</label>
+              <div class="toggle-switch-container">
+                <label class="toggle-switch">
+                  <input type="checkbox" id="prioritize-rating-checkbox" name="prioritize_rating" value="yes">
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Submit Button -->
+            <button type="submit" class="submit-btn">Get recommendations</button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+    <script>
+      // Update hidden inputs when toggle buttons are clicked
+      document.querySelectorAll('.algorithm-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+          document.getElementById('algorithm-input').value = this.dataset.value;
+        });
+      });
+    </script>
   </body>
 </html>
