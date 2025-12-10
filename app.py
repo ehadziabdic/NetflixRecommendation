@@ -1,19 +1,11 @@
 import os
-import sys
+import networkx as nx
 from typing import List, Dict, Any, Optional
-
 from flask import Flask, render_template, request, session
 
-# Ensure we can import project modules from the `src` folder
-REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-SRC_PATH = os.path.join(REPO_ROOT, "src")
-if SRC_PATH not in sys.path:
-    sys.path.insert(0, SRC_PATH)
-
-import graph as graph_mod
-import scoring as scoring_mod
-import graphvis
-import networkx as nx
+from src import graph as graph_mod
+from src import scoring as scoring_mod
+from src import graphvis
 
 app = Flask(__name__)
 # Use environment variable for secret key in production
@@ -21,26 +13,66 @@ app.secret_key = os.environ.get('SECRET_KEY', 'dev_key_change_in_production')
 
 
 # Load data and build graph once at startup
-RATINGS_PATH = os.path.join(REPO_ROOT, "res", "ratings.csv")
-MOVIES_PATH = os.path.join(REPO_ROOT, "res", "movies.csv")
+print("="*80)
+print("🎬 NETFLIX MOVIE RECOMMENDER - INITIALIZING")
+print("="*80)
 
-# Load CSVs
+RATINGS_PATH = "res/ratings_netflix.csv"
+MOVIES_PATH = "res/movies_netflix.csv"
+
+print("\n[1/5] 📂 Loading data...")
 RATINGS_DF, MOVIES_DF = graph_mod.load_data(RATINGS_PATH, MOVIES_PATH)
+print(f"      ✓ Loaded {len(RATINGS_DF):,} ratings and {len(MOVIES_DF):,} movies")
 
-# Use all users (no downsampling)
+print("\n[2/5] 👥 Filtering users (min 10 ratings ≥3.5)...")
 RATINGS_FILTERED = graph_mod.downsample_users(RATINGS_DF, min_likes=10, threshold=3.5, sample_n=None)
+print(f"      ✓ Filtered to {len(RATINGS_FILTERED):,} positive ratings")
 
-# Build bipartite graph and mappings
+print("\n[3/5] 🔗 Building bipartite graph...")
 G, MAPPINGS = graph_mod.build_bipartite_graph(RATINGS_FILTERED, MOVIES_DF, threshold=3.5)
+print(f"      ✓ Graph created with {G.number_of_nodes():,} nodes and {G.number_of_edges():,} edges")
 graph_mod.validate_graph(G)
 
 # Prepare lists for form selects
 USER_NODES = [n for n, d in G.nodes(data=True) if d.get("bipartite") == "user"]
 MOVIE_NODES = [n for n, d in G.nodes(data=True) if d.get("bipartite") == "movie"]
 
-# Helper to get likers of a movie node
+print("\n[4/5] ⚡ Building performance caches...")
+
+# Cache: movie_node -> set of user nodes who liked it
+print("      - Building movie likers cache...")
+MOVIE_LIKERS_CACHE = {}
+for m_node in MOVIE_NODES:
+    MOVIE_LIKERS_CACHE[m_node] = {nbr for nbr in G.neighbors(m_node) if G.nodes[nbr].get("bipartite") == "user"}
+
+# Cache: (movie_id, user_id) -> rating for O(1) lookups
+print("      - Building ratings lookup cache...")
+RATINGS_LOOKUP = {}
+for _, row in RATINGS_DF.iterrows():
+    RATINGS_LOOKUP[(int(row['movieId']), int(row['userId']))] = float(row['rating'])
+
+# Cache: movie_node -> genres set for faster filtering
+print("      - Building genres cache...")
+MOVIE_GENRES_CACHE = {}
+for m_node in MOVIE_NODES:
+    genres_str = G.nodes[m_node].get("genres")
+    if genres_str:
+        MOVIE_GENRES_CACHE[m_node] = set(str(genres_str).split('|'))
+    else:
+        MOVIE_GENRES_CACHE[m_node] = set()
+
+print(f"      ✓ Caches built: {len(MOVIE_LIKERS_CACHE):,} movies, {len(RATINGS_LOOKUP):,} ratings")
+
+print("\n[5/5] 🎯 Preparing movie and genre lists...")
+print(f"      ✓ Ready to serve recommendations!\n")
+print("="*80)
+print("✅ SERVER INITIALIZATION COMPLETE")
+print("="*80)
+print()
+
+# Helper to get likers of a movie node (now uses cache)
 def get_likers_of_movie_node(m_node: str) -> set:
-    return {nbr for nbr in G.neighbors(m_node) if G.nodes[nbr].get("bipartite") == "user"}
+    return MOVIE_LIKERS_CACHE.get(m_node, set())
 
 
 # Recommend movies for a given user node
@@ -107,7 +139,7 @@ def get_recommendations_for_user_node(user_node: str, top_n: int = 10, genre_fil
     return results[:top_n]
 
 
-# Recommend movies for a given user node or liked movies
+# Recommend movies for a given user node or liked movies (OPTIMIZED)
 def get_recommendations_for_liked_movies(
     liked_movie_ids: List[int], 
     top_n: int = 10, 
@@ -116,63 +148,83 @@ def get_recommendations_for_liked_movies(
     algorithm: str = "jaccard",
     prioritize_rating: bool = False
 ) -> List[Dict[str, Any]]:
-    # Build union of likers for selected movies
-    selected_movie_nodes = [f"m_{mid}" for mid in liked_movie_ids if f"m_{mid}" in MOVIE_NODES]
+    # Build union of likers for selected movies (using cache)
+    selected_movie_nodes = [f"m_{mid}" for mid in liked_movie_ids if f"m_{mid}" in MOVIE_LIKERS_CACHE]
+    
+    # Fast union using set operations
     user_set = set()
     for m_node in selected_movie_nodes:
-        for nbr in G.neighbors(m_node):
-            if G.nodes[nbr].get("bipartite") == "user":
-                user_set.add(nbr)
+        user_set.update(MOVIE_LIKERS_CACHE[m_node])
 
-    # Candidate movies exclude the selected ones
-    candidates = [m for m in MOVIE_NODES if m not in selected_movie_nodes]
+    # Early exit if no users found
+    if not user_set:
+        return []
+
+    # Build candidate list with genre pre-filtering
+    selected_set = set(selected_movie_nodes)
+    if genre_filter and genre_filter != "All":
+        candidates = [m for m in MOVIE_NODES 
+                     if m not in selected_set and genre_filter in MOVIE_GENRES_CACHE.get(m, set())]
+    else:
+        candidates = [m for m in MOVIE_NODES if m not in selected_set]
+    
+    # Pre-convert user nodes to IDs for rating lookups
+    user_ids = {MAPPINGS["node_to_user_id"][u] for u in user_set if u in MAPPINGS["node_to_user_id"]}
+    
     results = []
     
     for m in candidates:
-        # Genre filter
-        if genre_filter and genre_filter != "All":
-            genres = G.nodes[m].get("genres")
-            if not genres or genre_filter not in str(genres):
-                continue
-
-        # Likers of candidate
-        likers = set(get_likers_of_movie_node(m))
-
-        # Compute score based on algorithm
-        intersection = user_set.intersection(likers)
-        union = user_set.union(likers)
+        # Get likers from cache
+        likers = MOVIE_LIKERS_CACHE.get(m, set())
         
-        if algorithm == "cn":
-            # Common neighbors
-            score = len(intersection)
+        # Compute intersection once
+        intersection = user_set & likers
+        
+        # Skip if no intersection
+        if not intersection:
+            if algorithm == "jaccard":
+                score = 0.0
+            else:
+                score = 0
+            # Skip low scores early
+            if score == 0:
+                continue
         else:
-            # Jaccard (default)
-            score = len(intersection) / len(union) if len(union) > 0 else 0.0
-
-        # Average rating among intersection
+            # Compute score based on algorithm
+            if algorithm == "cn":
+                score = len(intersection)
+            else:
+                # Jaccard
+                union_size = len(user_set) + len(likers) - len(intersection)
+                score = len(intersection) / union_size if union_size > 0 else 0.0
+        
+        # Fast rating calculation using lookup dict
         avg_rating = None
-        if intersection:
-            supporter_ids = [MAPPINGS["node_to_user_id"].get(u) for u in intersection]
-            movie_id = MAPPINGS["node_to_movie_id"].get(m)
-            if movie_id is not None:
-                rows = RATINGS_DF[(RATINGS_DF["movieId"] == movie_id) & (RATINGS_DF["userId"].isin(supporter_ids))]
-                if not rows.empty:
-                    avg_rating = float(rows["rating"].mean())
-
+        movie_id = MAPPINGS["node_to_movie_id"].get(m)
+        
+        if movie_id and intersection:
+            supporter_ids = [MAPPINGS["node_to_user_id"][u] for u in intersection if u in MAPPINGS["node_to_user_id"]]
+            
+            # Use cached ratings lookup instead of DataFrame filtering
+            ratings_list = [RATINGS_LOOKUP.get((movie_id, uid)) for uid in supporter_ids]
+            ratings_list = [r for r in ratings_list if r is not None]
+            
+            if ratings_list:
+                avg_rating = sum(ratings_list) / len(ratings_list)
+        
         # Apply rating limit filter
-        if avg_rating is not None and avg_rating < rating_limit:
+        if rating_limit > 0.0 and (avg_rating is None or avg_rating < rating_limit):
             continue
-
+        
         # Apply rating weight if prioritize_rating is True
         final_score = score
         if prioritize_rating and avg_rating is not None:
-            # Weight score by normalized rating (0-1 scale)
             rating_weight = avg_rating / 5.0
             final_score = score * rating_weight
-
+        
         results.append({
             "movie_node": m,
-            "movie_id": MAPPINGS["node_to_movie_id"].get(m),
+            "movie_id": movie_id,
             "title": G.nodes[m].get("title"),
             "genres": G.nodes[m].get("genres"),
             "jaccard": score if algorithm == "jaccard" else None,
@@ -180,8 +232,8 @@ def get_recommendations_for_liked_movies(
             "avg_rating": avg_rating,
             "score": final_score
         })
-
-    # Sort by final score descending
+    
+    # Sort by final score descending and return top N
     results.sort(key=lambda x: -x["score"])
     return results[:top_n]
 

@@ -20,8 +20,20 @@ h1 {
     color: #ff1615;
     font-size: 3rem;
     letter-spacing: 2px;
-    margin-bottom: 30px;
+    margin-bottom: 15px;
     text-align: center;
+}
+
+/* Subtitle */
+.subtitle {
+    color: #ccc;
+    font-size: 1.1rem;
+    font-family: Arial, sans-serif;
+    text-align: center;
+    max-width: 900px;
+    margin: 0 auto 30px;
+    line-height: 1.6;
+    letter-spacing: 0.3px;
 }
 
 /* Main Container - Two Column Layout */
@@ -521,6 +533,394 @@ h1 {
     h1 {
         font-size: 2.5rem;
     }
+    
+    .subtitle {
+        font-size: 1rem;
+        max-width: 800px;
+        margin-bottom: 25px;
+    }
+    
+    .movie-list-container {
+        max-height: 400px;
+    }
+}
+
+@media (max-width: 992px) {
+    body {
+        padding: 15px;
+    }
+    
+    h1 {
+        font-size: 2rem;
+        margin-bottom: 20px;
+    }
+    
+    .subtitle {
+        font-size: 0.95rem;
+        max-width: 700px;
+        margin-bottom: 20px;
+    }
+    
+    .container {
+        gap: 20px;
+    }
+    
+    .controls-section,
+    .movie-list-container,
+    .your-movies-container,
+    .results-section {
+        padding: 20px;
+    }
+    
+    .control-label {
+        font-size: 1.3rem;
+    }
+    
+    .toggle-group {
+        gap: 8px;
+    }
+    
+    .submit-btn {
+        font-size: 1.3rem;
+        padding: 15px;
+    }
+    
+    .results-table th,
+    .results-table td {
+        padding: 10px 8px;
+        font-size: 0.9rem;
+    }
+    
+    /* Make table horizontally scrollable on medium screens */
+    .results-section {
+        overflow-x: auto;
+    }
+}
+
+@media (max-width: 768px) {
+    body {
+        padding: 10px;
+    }
+    
+    h1 {
+        font-size: 1.8rem;
+        margin-bottom: 15px;
+        letter-spacing: 1px;
+    }
+    
+    .subtitle {
+        font-size: 0.9rem;
+        max-width: 100%;
+        margin-bottom: 18px;
+        padding: 0 10px;
+    }
+    
+    .container {
+        gap: 15px;
+    }
+    
+    .search-input {
+        padding: 12px 45px 12px 15px;
+        font-size: 1rem;
+    }
+    
+    .search-icon {
+        right: 15px;
+        font-size: 1rem;
+    }
+    
+    .movie-list-container {
+        padding: 15px;
+        max-height: 350px;
+    }
+    
+    .movie-list-container h3 {
+        font-size: 1.1rem;
+    }
+    
+    .movie-item {
+        padding: 10px 12px;
+    }
+    
+    .movie-title {
+        font-size: 0.95rem;
+    }
+    
+    .heart-btn {
+        font-size: 1.3rem;
+        min-width: 35px;
+        min-height: 35px;
+    }
+    
+    .your-movies-container {
+        padding: 15px;
+        min-height: 150px;
+    }
+    
+    .your-movies-container h2 {
+        font-size: 1.5rem;
+    }
+    
+    .controls-section {
+        padding: 15px;
+    }
+    
+    .control-group {
+        margin-bottom: 15px;
+    }
+    
+    .control-label {
+        font-size: 1.2rem;
+        margin-bottom: 8px;
+    }
+    
+    .number-input,
+    .dropdown {
+        padding: 10px;
+        font-size: 1rem;
+    }
+    
+    .slider-value {
+        font-size: 1.1rem;
+        min-width: 35px;
+    }
+    
+    .toggle-btn {
+        padding: 10px;
+        font-size: 1rem;
+    }
+    
+    .toggle-switch {
+        width: 50px;
+        height: 26px;
+    }
+    
+    .toggle-slider:before {
+        height: 18px;
+        width: 18px;
+    }
+    
+    .toggle-switch input:checked + .toggle-slider:before {
+        transform: translateX(24px);
+    }
+    
+    .submit-btn {
+        padding: 14px;
+        font-size: 1.2rem;
+    }
+    
+    .results-section {
+        padding: 15px;
+    }
+    
+    .results-section h2 {
+        font-size: 1.6rem;
+        margin-bottom: 15px;
+    }
+    
+    .results-table th {
+        font-size: 0.85rem;
+        padding: 10px 6px;
+    }
+    
+    .results-table td {
+        padding: 8px 6px;
+        font-size: 0.85rem;
+    }
+}
+
+@media (max-width: 576px) {
+    body {
+        padding: 8px;
+    }
+    
+    h1 {
+        font-size: 1.5rem;
+        margin-bottom: 12px;
+    }
+    
+    .subtitle {
+        font-size: 0.85rem;
+        margin-bottom: 15px;
+        padding: 0 8px;
+        line-height: 1.5;
+    }
+    
+    .container {
+        gap: 12px;
+    }
+    
+    .search-input {
+        padding: 10px 40px 10px 12px;
+        font-size: 0.95rem;
+    }
+    
+    .movie-list-container,
+    .your-movies-container,
+    .controls-section,
+    .results-section {
+        padding: 12px;
+        border-radius: 8px;
+    }
+    
+    .movie-list-container {
+        max-height: 300px;
+    }
+    
+    .movie-list-container h3 {
+        font-size: 1rem;
+        margin-bottom: 10px;
+    }
+    
+    .movie-list-note {
+        font-size: 0.85rem;
+        margin-bottom: 10px;
+    }
+    
+    .movie-item,
+    .your-movie-item {
+        padding: 8px 10px;
+    }
+    
+    .movie-title {
+        font-size: 0.9rem;
+        letter-spacing: 0.3px;
+    }
+    
+    .heart-btn,
+    .remove-btn {
+        font-size: 1.2rem;
+        min-width: 32px;
+        min-height: 32px;
+    }
+    
+    .your-movies-container h2 {
+        font-size: 1.3rem;
+        margin-bottom: 10px;
+    }
+    
+    .control-label {
+        font-size: 1.1rem;
+    }
+    
+    .number-input,
+    .dropdown {
+        padding: 8px;
+        font-size: 0.95rem;
+    }
+    
+    .slider-container {
+        gap: 10px;
+    }
+    
+    .slider-value {
+        font-size: 1rem;
+        min-width: 30px;
+    }
+    
+    .toggle-group {
+        grid-template-columns: 1fr;
+        gap: 6px;
+    }
+    
+    .toggle-btn {
+        padding: 10px;
+        font-size: 0.95rem;
+    }
+    
+    .toggle-switch-container {
+        gap: 10px;
+    }
+    
+    .submit-btn {
+        padding: 12px;
+        font-size: 1.1rem;
+        letter-spacing: 1px;
+    }
+    
+    .results-section h2 {
+        font-size: 1.4rem;
+    }
+    
+    /* Stack table for very small screens */
+    .results-table {
+        font-size: 0.8rem;
+    }
+    
+    .results-table th,
+    .results-table td {
+        padding: 6px 4px;
+        font-size: 0.75rem;
+    }
+    
+    .results-table th {
+        white-space: nowrap;
+    }
+}
+
+/* Extra small devices (portrait phones) */
+@media (max-width: 400px) {
+    h1 {
+        font-size: 1.3rem;
+    }
+    
+    .subtitle {
+        font-size: 0.8rem;
+        margin-bottom: 12px;
+    }
+    
+    .search-input {
+        font-size: 0.9rem;
+        padding: 8px 35px 8px 10px;
+    }
+    
+    .search-icon {
+        right: 10px;
+        font-size: 0.9rem;
+    }
+    
+    .movie-title {
+        font-size: 0.85rem;
+    }
+    
+    .control-label {
+        font-size: 1rem;
+    }
+    
+    .submit-btn {
+        font-size: 1rem;
+    }
+}
+
+/* Landscape mode adjustments */
+@media (max-height: 600px) and (orientation: landscape) {
+    .movie-list-container {
+        max-height: 250px;
+    }
+    
+    .your-movies-container {
+        min-height: 120px;
+    }
+    
+    .info-panel {
+        max-height: 400px;
+    }
+}
+
+/* Tablets in portrait mode */
+@media (min-width: 768px) and (max-width: 1024px) and (orientation: portrait) {
+    .container {
+        grid-template-columns: 1fr;
+        max-width: 700px;
+    }
+    
+    h1 {
+        font-size: 2.2rem;
+    }
+    
+    .movie-list-container {
+        max-height: 400px;
+    }
 }
 
 /* Hidden class */
@@ -760,5 +1160,250 @@ h1 {
     
     .graph-bottom-buttons {
         grid-column: 1;
+    }
+}
+
+/* Recommendations Page Responsive */
+@media (max-width: 992px) {
+    .recommendations-page {
+        padding: 15px;
+    }
+    
+    .recommendations-table-container {
+        padding: 20px;
+    }
+    
+    .recommendations-full-table th {
+        padding: 15px 10px;
+        font-size: 1.1rem;
+    }
+    
+    .recommendations-full-table td {
+        padding: 12px 10px;
+        font-size: 0.95rem;
+    }
+    
+    .bottom-buttons {
+        flex-direction: column;
+        gap: 15px;
+    }
+    
+    .bottom-btn {
+        font-size: 1.3rem;
+        padding: 16px;
+    }
+}
+
+@media (max-width: 768px) {
+    .recommendations-page {
+        padding: 10px;
+    }
+    
+    .recommendations-table-container {
+        padding: 15px;
+        overflow-x: auto;
+    }
+    
+    .recommendations-full-table {
+        min-width: 600px;
+    }
+    
+    .recommendations-full-table th {
+        padding: 12px 8px;
+        font-size: 1rem;
+        white-space: nowrap;
+    }
+    
+    .recommendations-full-table td {
+        padding: 10px 8px;
+        font-size: 0.9rem;
+    }
+    
+    .bottom-btn {
+        font-size: 1.2rem;
+        padding: 14px;
+    }
+}
+
+@media (max-width: 576px) {
+    .recommendations-table-container {
+        padding: 12px;
+    }
+    
+    .recommendations-full-table {
+        min-width: 500px;
+        font-size: 0.85rem;
+    }
+    
+    .recommendations-full-table th {
+        padding: 10px 6px;
+        font-size: 0.9rem;
+    }
+    
+    .recommendations-full-table td {
+        padding: 8px 6px;
+        font-size: 0.85rem;
+    }
+    
+    .bottom-btn {
+        font-size: 1.1rem;
+        padding: 12px;
+    }
+}
+
+/* Graph Page Responsive */
+@media (max-width: 992px) {
+    .graph-page {
+        padding: 15px;
+        gap: 15px;
+    }
+    
+    .graph-container {
+        padding: 15px;
+    }
+    
+    .graph-area {
+        min-height: 500px;
+    }
+    
+    .info-panel {
+        padding: 20px;
+        max-height: 500px;
+    }
+    
+    .info-panel h3 {
+        font-size: 1.6rem;
+    }
+}
+
+@media (max-width: 768px) {
+    .graph-page {
+        padding: 10px;
+        gap: 12px;
+    }
+    
+    .graph-container {
+        padding: 12px;
+    }
+    
+    .graph-area {
+        min-height: 400px;
+    }
+    
+    .info-panel {
+        padding: 15px;
+        max-height: 450px;
+    }
+    
+    .info-panel h3 {
+        font-size: 1.4rem;
+        margin-bottom: 12px;
+    }
+    
+    .info-description {
+        font-size: 0.9rem;
+        margin-bottom: 15px;
+    }
+    
+    .similar-users-list {
+        gap: 12px;
+    }
+    
+    .similar-user-item {
+        padding: 12px;
+    }
+    
+    .user-label {
+        font-size: 1rem;
+    }
+    
+    .shared-badge {
+        font-size: 0.8rem;
+        padding: 3px 8px;
+    }
+    
+    .shared-movies {
+        font-size: 0.85rem;
+    }
+    
+    .graph-bottom-buttons {
+        gap: 12px;
+        margin-top: 15px;
+    }
+}
+
+@media (max-width: 576px) {
+    .graph-page {
+        padding: 8px;
+        gap: 10px;
+    }
+    
+    .graph-container {
+        padding: 10px;
+    }
+    
+    .graph-area {
+        min-height: 350px;
+    }
+    
+    .info-panel {
+        padding: 12px;
+        max-height: 400px;
+    }
+    
+    .info-panel h3 {
+        font-size: 1.3rem;
+    }
+    
+    .info-description {
+        font-size: 0.85rem;
+    }
+    
+    .similar-user-item {
+        padding: 10px;
+    }
+    
+    .user-label {
+        font-size: 0.95rem;
+    }
+    
+    .shared-badge {
+        font-size: 0.75rem;
+    }
+    
+    .shared-movies {
+        font-size: 0.8rem;
+    }
+    
+    .graph-bottom-buttons {
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .error-message {
+        padding: 20px;
+    }
+    
+    .error-message p {
+        font-size: 1.1rem;
+    }
+}
+
+/* Ultra-wide screens optimization */
+@media (min-width: 1920px) {
+    .container {
+        max-width: 1800px;
+    }
+    
+    h1 {
+        font-size: 3.5rem;
+    }
+    
+    .graph-page {
+        max-width: 1900px;
+    }
+    
+    .recommendations-page {
+        max-width: 1600px;
     }
 }

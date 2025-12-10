@@ -75,10 +75,9 @@ def build_bipartite_graph(
         node_name = f"u_{uid}"
         G.add_node(node_name, bipartite="user", userId=int(uid))
 
-    # Prepare movie lookup and add movie nodes referenced by ratings
+    # Add ALL movie nodes from movies DataFrame (not just those with ratings)
     movies_index = movies.set_index("movieId")
-    unique_movie_ids = ratings["movieId"].unique()
-    for mid in unique_movie_ids:
+    for mid in movies["movieId"].unique():
         node_name = f"m_{mid}"
         attrs = {"bipartite": "movie", "movieId": int(mid)}
         if mid in movies_index.index:

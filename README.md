@@ -1,6 +1,6 @@
 # 🎬 Netflix Movie Recommender
 
-A graph-based movie recommendation system using bipartite graphs and collaborative filtering algorithms.
+A graph-based movie recommendation system only for movies available on Netflix. System uses bipartite graph of users and movies for recommendations.
 
 **Academic Project** • Algorithms and Data Structures 2 • Data Science and AI • ETF Sarajevo
 
@@ -13,19 +13,19 @@ A graph-based movie recommendation system using bipartite graphs and collaborati
 
 ## 📋 Table of Contents
 
-- [Overview](#overview)
-- [Features](#features)
-- [Demo](#demo)
-- [Technologies](#technologies)
-- [Architecture](#architecture)
-- [Algorithms](#algorithms)
-- [Installation](#installation)
-- [Usage](#usage)
-- [Project Structure](#project-structure)
-- [Screenshots](#screenshots)
-- [Deployment](#deployment)
-- [Contributing](#contributing)
-- [License](#license)
+- [Overview](#-overview)
+- [Features](#-features)
+- [Demo](#-demo)
+- [Technologies](#%EF%B8%8F-technologies)
+- [Architecture](#%EF%B8%8F-architecture)
+- [Algorithms](#-algorithms)
+- [Installation](#-installation)
+- [Usage](#-usage)
+- [Project Structure](#-project-structure)
+- [Screenshots](#-screenshots)
+- [Deployment](#-deployment)
+- [Contributing](#-contributing)
+- [License](#-license)
 
 ---
 
@@ -40,15 +40,18 @@ The system analyzes user-movie relationships in a bipartite graph structure to f
 ## ✨ Features
 
 ### Core Functionality
+
 - 🎯 **Smart Recommendations** - Jaccard similarity & Common Neighbors algorithms
 - 👥 **Similar Users Detection** - Find users with matching movie preferences
 - 🎨 **Interactive Visualization** - Plotly-based bipartite graph exploration
-- 🔍 **Real-time Search** - Filter through 9,000+ movies instantly
+- 🔍 **Real-time Search** - Filter through 4,800+ Netflix movies instantly
 - ⭐ **Rating Filter** - Set minimum rating thresholds (0-5 stars)
 - 🎭 **Genre Filtering** - Filter by specific movie genres
 - ❤️ **Like System** - Select multiple movies to build preference profile
+- ⚡ **Optimized Performance** - 10-50x faster with pre-computed caches
 
 ### User Experience
+
 - 🌙 **Netflix Dark Theme** - Modern, familiar interface
 - 📱 **Responsive Design** - Works on desktop, tablet, and mobile
 - 🚀 **Fast Performance** - Optimized graph algorithms
@@ -60,7 +63,8 @@ The system analyzes user-movie relationships in a bipartite graph structure to f
 
 **Live Demo:** [https://ln.run/NetflixRecommendation](https://netflix-movie-recommender.onrender.com) *(may take 30s to wake up)*
 
-### Quick Tour:
+### Quick Tour
+
 1. 🔍 Search and select movies you like
 2. ⚙️ Configure recommendation settings
 3. 🎯 Get personalized recommendations
@@ -72,6 +76,7 @@ The system analyzes user-movie relationships in a bipartite graph structure to f
 ## 🛠️ Technologies
 
 ### Backend
+
 - **Python 3.11** - Core programming language
 - **Flask 3.0** - Web framework
 - **NetworkX 2.8** - Graph algorithms and data structures
@@ -79,13 +84,16 @@ The system analyzes user-movie relationships in a bipartite graph structure to f
 - **Plotly 5.0** - Interactive graph visualizations
 
 ### Frontend
+
 - **HTML5 & CSS3** - Structure and styling
 - **JavaScript (ES6+)** - Client-side interactivity
 - **Font Awesome 6.5** - Icon library
 
 ### Data
-- **MovieLens Dataset** - 100,000+ ratings from 600+ users on 9,000+ movies
-- **CSV Format** - ratings.csv, movies.csv, tags.csv, links.csv
+
+- **MovieLens Dataset** - 100,000+ ratings from 600+ users
+- **Netflix Filtered Subset** - ~4,800 movies available on Netflix
+- **CSV Format** - ratings_netflix.csv, movies_netflix.csv, netflix_titles.csv
 
 ---
 
@@ -93,7 +101,7 @@ The system analyzes user-movie relationships in a bipartite graph structure to f
 
 ### Bipartite Graph Structure
 
-```
+```txt
        Users                Movies
     ┌─────────┐          ┌─────────┐
     │ User 1  │──────────│ Movie A │
@@ -130,7 +138,7 @@ The system analyzes user-movie relationships in a bipartite graph structure to f
 
 Measures overlap between user movie sets:
 
-```
+```txt
 J(A,B) = |A ∩ B| / |A ∪ B|
 ```
 
@@ -140,7 +148,7 @@ J(A,B) = |A ∩ B| / |A ∪ B|
 
 Counts shared movie preferences:
 
-```
+```txt
 CN(u,v) = |N(u) ∩ N(v)|
 ```
 
@@ -150,7 +158,7 @@ CN(u,v) = |N(u) ∩ N(v)|
 
 Optional weighted scoring:
 
-```
+```txt
 Score_weighted = Score × (avg_rating / 5.0)
 ```
 
@@ -161,17 +169,20 @@ Score_weighted = Score × (avg_rating / 5.0)
 ## 📦 Installation
 
 ### Prerequisites
+
 - Python 3.11 or higher
 - pip (Python package manager)
 - Git
 
 ### Step 1: Clone Repository
+
 ```bash
 git clone https://github.com/ehadziabdic/NetflixRecommendation.git
 cd NetflixRecommendation
 ```
 
 ### Step 2: Create Virtual Environment
+
 ```bash
 python -m venv .venv
 .venv\Scripts\activate  # Windows
@@ -179,16 +190,19 @@ python -m venv .venv
 ```
 
 ### Step 3: Install Dependencies
+
 ```bash
 pip install -r requirements.txt
 ```
 
 ### Step 4: Set Environment Variables
+
 ```bash
 copy .env.example .env
 ```
 
 Edit `.env` and add your secret key:
+
 ```env
 SECRET_KEY=your_generated_secret_key_here
 FLASK_DEBUG=True
@@ -196,6 +210,7 @@ PORT=5000
 ```
 
 Generate secret key:
+
 ```bash
 python -c "import secrets; print(secrets.token_hex(32))"
 ```
@@ -205,8 +220,8 @@ python -c "import secrets; print(secrets.token_hex(32))"
 ## 🚀 Usage
 
 ### Run Locally
+
 ```bash
-cd web
 python app.py
 ```
 
@@ -244,54 +259,80 @@ Open browser: `http://localhost:5000`
 
 ## 📁 Project Structure
 
-```
+```txt
 NetflixRecommendation/
-├── web/                      # Web application
-│   ├── app.py               # Flask application & routes
-│   ├── templates/           # HTML templates
-│   │   ├── index.html       # Main page (movie selection)
-│   │   ├── recommendations.html  # Results page
-│   │   └── graph.html       # Graph visualization
-│   └── static/              # Static assets
-│       ├── css/
-│       │   └── style.css    # Netflix dark theme styling
-│       ├── js/
-│       │   └── script.js    # Client-side interactivity
-│       └── icons/
-│           └── favcon.png   # Favicon
-├── src/                     # Core algorithms
+├── app.py                   # Flask application & routes (main entry)
+├── test.py                  # Testing & analysis suite
+├── src/                     # Core algorithms (optimized)
 │   ├── graph.py            # Graph construction & data loading
-│   ├── scoring.py          # Recommendation algorithms
+│   ├── scoring.py          # Recommendation algorithms (Jaccard/CN)
 │   └── graphvis.py         # Plotly visualization generator
-├── res/                     # MovieLens dataset
-│   ├── ratings.csv         # User ratings (100K entries)
-│   ├── movies.csv          # Movie metadata (9K movies)
-│   ├── tags.csv            # User-generated tags
-│   └── links.csv           # External IDs (IMDB, TMDB)
-├── test/                    # Testing & analysis
-│   ├── test.py             # Basic recommendation tests
-│   ├── recommend.py        # CLI recommendation tool
-│   └── graphshow.py        # Matplotlib graph visualization
-├── docs/                    # Documentation
-│   └── EDA.ipynb           # Exploratory Data Analysis notebook
-├── requirements.txt         # Python dependencies
+├── templates/               # HTML templates
+│   ├── index.html          # Main page (movie selection)
+│   ├── recommendations.html # Results display
+│   └── graph.html          # Interactive graph visualization
+├── static/                  # Static assets
+│   ├── css/
+│   │   └── style.css       # Netflix dark theme styling
+│   ├── js/
+│   │   └── script.js       # Client-side interactivity
+│   └── icons/
+│       └── favicon.png     # Site favicon
+├── notebooks/               # Jupyter notebooks
+│   ├── EDA.ipynb           # Exploratory Data Analysis
+│   └── Filtering.ipynb     # Data filtering pipeline (Netflix subset)
+├── res/                     # Dataset files
+│   ├── movies.csv          # Full MovieLens dataset (~87K movies)
+│   ├── movies_netflix.csv  # ✅ Filtered Netflix movies (~4.8K)
+│   ├── ratings.csv         # Full ratings dataset (100K+ entries)
+│   ├── ratings_netflix.csv # ✅ Filtered Netflix ratings
+│   └── netflix_titles.csv  # Netflix catalog reference (~6K)
+├── .venv/                   # Python virtual environment
+├── .env                     # Environment variables (SECRET_KEY, etc.)
 ├── .env.example            # Environment template
+├── requirements.txt         # Python dependencies
 ├── .gitignore              # Git ignore rules
-├── DEPLOYMENT.md           # Deployment guide
+├── .gitattributes          # Git attributes
+├── LICENSE                 # MIT License
 └── README.md               # This file
 ```
+
+### Key Files
+
+- **`app.py`**: Main Flask application with optimized recommendation engine
+  - Pre-computed caches for 10-50x performance improvement
+  - Supports Jaccard similarity and Common Neighbors algorithms
+  - Genre filtering, rating limits, and weighted scoring
+  
+- **`src/scoring.py`**: Core recommendation algorithms
+  - Optimized Jaccard 2-hop similarity
+  - Common neighbors counting
+  - Batch scoring for multiple candidates
+  
+- **`src/graph.py`**: Bipartite graph construction
+  - Data loading and validation
+  - User downsampling (min 10 ratings ≥3.5)
+  - Node/edge creation with metadata
+  
+- **`notebooks/Filtering.ipynb`**: Data preprocessing
+  - Multi-strategy title matching (with/without year)
+  - Text cleaning and normalization
+  - Filters movies.csv to Netflix-only subset (~4.8K from 87K)
 
 ---
 
 ## 📸 Screenshots
 
 ### Main Page - Movie Selection
+
 ![Main Page](https://i.ibb.co/v4ZZFGx9/image.png)
 
 ### Recommendations Table
+
 ![Results](https://i.ibb.co/Xr120xzK/image.png)
 
 ### Interactive Graph Visualization
+
 ![Graph](https://i.ibb.co/kgGqL1NQ/image.png)
 
 ---
@@ -301,6 +342,7 @@ NetflixRecommendation/
 ### Deploy on Render (Free)
 
 1. **Push to GitHub:**
+
    ```bash
    git push origin main
    ```
@@ -313,7 +355,7 @@ NetflixRecommendation/
    - New → Web Service
    - Connect repository
    - Build: `pip install -r requirements.txt`
-   - Start: `cd web && python app.py`
+   - Start: `python app.py`
    - Add environment variable: `SECRET_KEY`
 
 4. **Access:**
@@ -356,9 +398,4 @@ ETF Sarajevo
 - Project Link: [https://github.com/ehadziabdic/NetflixRecommendation](https://github.com/ehadziabdic/NetflixRecommendation)
 
 ---
-
-<div align="center">
-
 ⭐ Star this repo if you found it helpful!
-
-</div>

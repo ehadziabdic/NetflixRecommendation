@@ -11,35 +11,71 @@
 # Default Imports
 import matplotlib.pyplot as plt
 import networkx as nx
-import sys
-import os
-
-# Getting src/
-REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-SRC_PATH = os.path.join(REPO_ROOT, "src")
-if SRC_PATH not in sys.path:
-    sys.path.insert(0, SRC_PATH)
 
 # File Imports
-import graph as graph_mod
-import scoring as scoring_mod
+from src import graph as graph_mod
+from src import scoring as scoring_mod
 
 # Load data and build graph
-repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-ratings_path = os.path.join(repo_root, "res", "ratings.csv")
-movies_path = os.path.join(repo_root, "res", "movies.csv")
+print("="*80)
+print("🎬 NETFLIX RECOMMENDATION TEST - INITIALIZING")
+print("="*80)
 
-# Use all users
+ratings_path = "res/ratings_netflix.csv"
+movies_path = "res/movies_netflix.csv"
+
+print("\n[1/5] 📂 Loading data...")
 ratings_df, movies_df = graph_mod.load_data(ratings_path, movies_path)
-ratings_filtered = graph_mod.downsample_users(ratings_df, min_likes=10, threshold=3.5, sample_n=None)
-G, mappings = graph_mod.build_bipartite_graph(ratings_filtered, movies_df, threshold=3.5)
+print(f"      ✓ Loaded {len(ratings_df):,} ratings and {len(movies_df):,} movies")
 
-print(f"Graph contains {G.number_of_nodes()} nodes and {G.number_of_edges()} edges")
+print("\n[2/5] 👥 Filtering users (min 10 ratings ≥3.5)...")
+ratings_filtered = graph_mod.downsample_users(ratings_df, min_likes=10, threshold=3.5, sample_n=None)
+print(f"      ✓ Filtered to {len(ratings_filtered):,} positive ratings")
+
+print("\n[3/5] 🔗 Building bipartite graph...")
+G, mappings = graph_mod.build_bipartite_graph(ratings_filtered, movies_df, threshold=3.5)
+print(f"      ✓ Graph created with {G.number_of_nodes():,} nodes and {G.number_of_edges():,} edges")
 
 # Get user and movie nodes
 user_nodes = [n for n, d in G.nodes(data=True) if d.get('bipartite') == 'user']
 movie_nodes = [n for n, d in G.nodes(data=True) if d.get('bipartite') == 'movie']
-print(f"Users: {len(user_nodes)}, Movies: {len(movie_nodes)}")
+print(f"      ✓ Users: {len(user_nodes):,}, Movies: {len(movie_nodes):,}")
+
+# ============================================================================
+# PERFORMANCE OPTIMIZATION: Pre-compute expensive data structures at startup
+# ============================================================================
+
+print("\n[4/5] ⚡ Building performance caches...")
+
+# Cache: movie_node -> set of user nodes who liked it
+print("      - Building movie likers cache...")
+movie_likers_cache = {}
+for m_node in movie_nodes:
+    movie_likers_cache[m_node] = {nbr for nbr in G.neighbors(m_node) if G.nodes[nbr].get("bipartite") == "user"}
+
+# Cache: (movie_id, user_id) -> rating for O(1) lookups
+print("      - Building ratings lookup cache...")
+ratings_lookup = {}
+for _, row in ratings_df.iterrows():
+    ratings_lookup[(int(row['movieId']), int(row['userId']))] = float(row['rating'])
+
+# Cache: movie_node -> genres set for faster filtering
+print("      - Building genres cache...")
+movie_genres_cache = {}
+for m_node in movie_nodes:
+    genres_str = G.nodes[m_node].get("genres")
+    if genres_str:
+        movie_genres_cache[m_node] = set(str(genres_str).split('|'))
+    else:
+        movie_genres_cache[m_node] = set()
+
+print(f"      ✓ Caches built: {len(movie_likers_cache):,} movies, {len(ratings_lookup):,} ratings")
+
+print("\n[5/5] 🎯 Initialization complete!\n")
+print("="*80)
+print("✅ READY FOR TESTING")
+print("="*80)
+print()
 
 # Get movie title
 def get_movie_title(movie_node):
@@ -48,16 +84,17 @@ def get_movie_title(movie_node):
         return movies_df[movies_df['movieId'] == movie_id]['title'].values[0]
     return movie_node
 
-# Find similar users
+# Find similar users (OPTIMIZED)
 def find_similar_users(user_node, top_n=5):
-    # Get movies liked by user
+    # Get movies liked by user from cache
     user_movies = [m for m in G.neighbors(user_node) if G.nodes[m].get('bipartite') == 'movie']
     
-    # Find users at distance 2 (via shared movies)
+    # Find users at distance 2 (via shared movies) using cache
     user_similarity = {}
     for movie in user_movies:
-        for other_user in G.neighbors(movie):
-            if other_user != user_node and G.nodes[other_user].get('bipartite') == 'user':
+        # Use cached likers instead of graph traversal
+        for other_user in movie_likers_cache.get(movie, set()):
+            if other_user != user_node:
                 if other_user not in user_similarity:
                     user_similarity[other_user] = 0
                 user_similarity[other_user] += 1
@@ -66,24 +103,56 @@ def find_similar_users(user_node, top_n=5):
     similar = sorted(user_similarity.items(), key=lambda x: x[1], reverse=True)[:top_n]
     return similar
 
-# Get recommendations
-def get_recommendations(user_node, top_k=10):
+# Get recommendations (OPTIMIZED)
+def get_recommendations(user_node, top_k=10, genre_filter=None):
     # Movies already seen
     seen = {m for m in G.neighbors(user_node) if G.nodes[m].get('bipartite') == 'movie'}
     
-    # Candidate movies
-    candidates = [m for m in movie_nodes if m not in seen]
+    # Candidate movies with optional genre filter
+    if genre_filter and genre_filter != "All":
+        candidates = [m for m in movie_nodes 
+                     if m not in seen and genre_filter in movie_genres_cache.get(m, set())]
+    else:
+        candidates = [m for m in movie_nodes if m not in seen]
     
-    # Calculate scores
+    # Pre-compute 2-hop users once
+    lengths_u = nx.single_source_shortest_path_length(G, source=user_node, cutoff=2)
+    users_2hop = {n for n, d in lengths_u.items() if d == 2 and G.nodes[n].get("bipartite") == "user"}
+    
+    # Calculate scores using cache
     results = []
     for m in candidates:
-        jacc = scoring_mod.jaccard_2hop_score(user_node, m, G)
-        cn = scoring_mod.common_neighbors_count(user_node, m, G)
+        # Get likers from cache
+        likers = movie_likers_cache.get(m, set())
+        
+        # Calculate intersection
+        intersection = users_2hop & likers
+        
+        # Jaccard score
+        if not intersection:
+            jacc = 0.0
+        else:
+            union_size = len(users_2hop) + len(likers) - len(intersection)
+            jacc = len(intersection) / union_size if union_size > 0 else 0.0
+        
+        cn = len(intersection)
+        
+        # Calculate average rating using cache
+        avg_rating = None
+        movie_id = mappings['node_to_movie_id'].get(m)
+        if movie_id and intersection:
+            supporter_ids = [mappings['node_to_user_id'][u] for u in intersection if u in mappings['node_to_user_id']]
+            ratings_list = [ratings_lookup.get((movie_id, uid)) for uid in supporter_ids]
+            ratings_list = [r for r in ratings_list if r is not None]
+            if ratings_list:
+                avg_rating = sum(ratings_list) / len(ratings_list)
+        
         results.append({
             'movie_node': m,
             'jaccard': jacc,
             'common_neighbors': cn,
-            'title': get_movie_title(m)
+            'title': get_movie_title(m),
+            'avg_rating': avg_rating
         })
     
     # Sort by jaccard then common neighbors
@@ -130,11 +199,12 @@ def display_user_info(user_node='u_1', top_k=10):
     recommendations = get_recommendations(user_node, top_k=top_k)
     print(f"\n⭐ TOP-{top_k} RECOMMENDED MOVIES:")
     print("-" * 80)
-    print(f"{'Rank':<6} {'Title':<50} {'Jaccard':<10} {'Common Users'}")
+    print(f"{'Rank':<6} {'Title':<50} {'Jaccard':<10} {'Common Users':<13} {'Avg Rating'}")
     print("-" * 80)
     for i, rec in enumerate(recommendations, 1):
         title = rec['title'][:47] + '...' if len(rec['title']) > 50 else rec['title']
-        print(f"{i:<6} {title:<50} {rec['jaccard']:.4f}    {rec['common_neighbors']}")
+        avg_rating_str = f"{rec['avg_rating']:.2f}" if rec['avg_rating'] else "N/A"
+        print(f"{i:<6} {title:<50} {rec['jaccard']:.4f}    {rec['common_neighbors']:<13} {avg_rating_str}")
     
     # Visualization
     print("\n📊 Generating visualization...")
@@ -225,4 +295,4 @@ def visualize_user_neighborhood(user_node, top_recommendations):
 
 # Main execution
 if __name__ == "__main__":
-    display_user_info('u_1', top_k=10)
+    display_user_info('u_111', top_k=10)
