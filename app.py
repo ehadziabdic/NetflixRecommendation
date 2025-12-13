@@ -33,6 +33,12 @@ G, MAPPINGS = graph_mod.build_bipartite_graph(RATINGS_FILTERED, MOVIES_DF, thres
 print(f"      ✓ Graph created with {G.number_of_nodes():,} nodes and {G.number_of_edges():,} edges")
 graph_mod.validate_graph(G)
 
+# Free memory: delete filtered ratings and movies DataFrames (no longer needed)
+del RATINGS_FILTERED
+import gc
+gc.collect()
+print("      ✓ Freed memory from unused DataFrames")
+
 # Prepare lists for form selects
 USER_NODES = [n for n, d in G.nodes(data=True) if d.get("bipartite") == "user"]
 MOVIE_NODES = [n for n, d in G.nodes(data=True) if d.get("bipartite") == "movie"]
@@ -61,7 +67,7 @@ for m_node in MOVIE_NODES:
     else:
         MOVIE_GENRES_CACHE[m_node] = set()
 
-print(f"      ✓ Caches built: {len(MOVIE_LIKERS_CACHE):,} movies, {len(RATINGS_LOOKUP):,} ratings")
+print(f"      ✓ Caches built: {len(MOVIE_LIKERS_CACHE):,} movies, {len(RATINGS_LOOKUP):,} rating lookups")
 
 print("\n[5/5] 🎯 Preparing movie and genre lists...")
 print(f"      ✓ Ready to serve recommendations!\n")
@@ -70,7 +76,7 @@ print("✅ SERVER INITIALIZATION COMPLETE")
 print("="*80)
 print()
 
-# Helper to get likers of a movie node (now uses cache)
+# Helper to get likers of a movie node (uses cache)
 def get_likers_of_movie_node(m_node: str) -> set:
     return MOVIE_LIKERS_CACHE.get(m_node, set())
 
@@ -198,19 +204,19 @@ def get_recommendations_for_liked_movies(
                 union_size = len(user_set) + len(likers) - len(intersection)
                 score = len(intersection) / union_size if union_size > 0 else 0.0
         
-        # Fast rating calculation using lookup dict
+        # Fast rating calculation using lookup cache
         avg_rating = None
         movie_id = MAPPINGS["node_to_movie_id"].get(m)
         
         if movie_id and intersection:
             supporter_ids = [MAPPINGS["node_to_user_id"][u] for u in intersection if u in MAPPINGS["node_to_user_id"]]
             
-            # Use cached ratings lookup instead of DataFrame filtering
-            ratings_list = [RATINGS_LOOKUP.get((movie_id, uid)) for uid in supporter_ids]
-            ratings_list = [r for r in ratings_list if r is not None]
+            # Use O(1) cache lookup for ratings
+            ratings = [RATINGS_LOOKUP.get((movie_id, uid)) for uid in supporter_ids]
+            ratings = [r for r in ratings if r is not None]
             
-            if ratings_list:
-                avg_rating = sum(ratings_list) / len(ratings_list)
+            if ratings:
+                avg_rating = sum(ratings) / len(ratings)
         
         # Apply rating limit filter
         if rating_limit > 0.0 and (avg_rating is None or avg_rating < rating_limit):
