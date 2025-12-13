@@ -45,42 +45,34 @@ G, MAPPINGS = graph_mod.build_bipartite_graph(RATINGS_FILTERED, MOVIES_DF, thres
 print(f"      ✓ Graph created with {G.number_of_nodes():,} nodes and {G.number_of_edges():,} edges")
 graph_mod.validate_graph(G)
 
-# Free memory: delete filtered ratings and movies DataFrames (no longer needed)
+# Free memory: delete filtered ratings DataFrame (no longer needed)
 del RATINGS_FILTERED
 import gc
 gc.collect()
-print("      ✓ Freed memory from unused DataFrames")
+print("      ✓ Freed memory from filtered DataFrame", flush=True)
+print(f"[DEBUG] Memory after cleanup: {process.memory_info().rss / 1024 / 1024:.1f} MB", flush=True)
 
 # Prepare lists for form selects
 USER_NODES = [n for n, d in G.nodes(data=True) if d.get("bipartite") == "user"]
 MOVIE_NODES = [n for n, d in G.nodes(data=True) if d.get("bipartite") == "movie"]
 
-print("\n[4/5] ⚡ Building performance caches...")
+print("\n[4/5] ⚡ Building performance caches...", flush=True)
 
 # Cache: movie_node -> set of user nodes who liked it
-print("      - Building movie likers cache...")
-MOVIE_LIKERS_CACHE = {}
-for m_node in MOVIE_NODES:
-    MOVIE_LIKERS_CACHE[m_node] = {nbr for nbr in G.neighbors(m_node) if G.nodes[nbr].get("bipartite") == "user"}
-
-# RATINGS CACHE DISABLED FOR MEMORY OPTIMIZATION
-# Cache: (movie_id, user_id) -> rating for O(1) lookups
-# print("      - Building ratings lookup cache...")
-# RATINGS_LOOKUP = {}
-# for _, row in RATINGS_DF.iterrows():
-#     RATINGS_LOOKUP[(int(row['movieId']), int(row['userId']))] = float(row['rating'])
+print("      - Building movie likers cache...", flush=True)
+MOVIE_LIKERS_CACHE = graph_mod.precompute_movie_likers(G)
+print(f"      ✓ Cached likers for {len(MOVIE_LIKERS_CACHE):,} movies", flush=True)
 
 # Cache: movie_node -> genres set for faster filtering
-print("      - Building genres cache...")
-MOVIE_GENRES_CACHE = {}
-for m_node in MOVIE_NODES:
-    genres_str = G.nodes[m_node].get("genres")
-    if genres_str:
-        MOVIE_GENRES_CACHE[m_node] = set(str(genres_str).split('|'))
-    else:
-        MOVIE_GENRES_CACHE[m_node] = set()
+print("      - Building genres cache...", flush=True)
+MOVIE_GENRES_CACHE = graph_mod.precompute_movie_genres(G)
+print(f"      ✓ Cached genres for {len(MOVIE_GENRES_CACHE):,} movies", flush=True)
 
-print(f"      ✓ Caches built: {len(MOVIE_LIKERS_CACHE):,} movies (ratings cache disabled)")
+# Cache: userId -> {movieId: rating} for fast lookups
+RATINGS_LOOKUP = graph_mod.precompute_ratings_lookup(RATINGS_DF)
+print(f"      ✓ Cached ratings for {len(RATINGS_LOOKUP):,} users", flush=True)
+
+print(f"[DEBUG] Memory after caches: {process.memory_info().rss / 1024 / 1024:.1f} MB", flush=True)
 
 print("\n[5/5] 🎯 Preparing movie and genre lists...")
 print(f"      ✓ Ready to serve recommendations!\n")
@@ -224,11 +216,14 @@ def get_recommendations_for_liked_movies(
         if movie_id and intersection:
             supporter_ids = [MAPPINGS["node_to_user_id"][u] for u in intersection if u in MAPPINGS["node_to_user_id"]]
             
-            # Use DataFrame filtering (ratings cache disabled for memory)
-            rows = RATINGS_DF[(RATINGS_DF["movieId"] == movie_id) & (RATINGS_DF["userId"].isin(supporter_ids))]
+            # Use memory-efficient ratings cache
+            ratings_list = []
+            for uid in supporter_ids:
+                if uid in RATINGS_LOOKUP and movie_id in RATINGS_LOOKUP[uid]:
+                    ratings_list.append(RATINGS_LOOKUP[uid][movie_id])
             
-            if not rows.empty:
-                avg_rating = float(rows["rating"].mean())
+            if ratings_list:
+                avg_rating = sum(ratings_list) / len(ratings_list)
         
         # Apply rating limit filter
         if rating_limit > 0.0 and (avg_rating is None or avg_rating < rating_limit):
