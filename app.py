@@ -1,4 +1,5 @@
 import os
+import sys
 import networkx as nx
 from typing import List, Dict, Any, Optional
 from flask import Flask, render_template, request, session
@@ -7,25 +8,37 @@ from src import graph as graph_mod
 from src import scoring as scoring_mod
 from src import graphvis
 
+# Force stdout/stderr to flush immediately for debugging
+sys.stdout.reconfigure(line_buffering=True)
+sys.stderr.reconfigure(line_buffering=True)
+
 app = Flask(__name__)
 # Use environment variable for secret key in production
 app.secret_key = os.environ.get('SECRET_KEY', 'dev_key_change_in_production')
 
+print("[DEBUG] Flask app created", flush=True)
+
 # Load data and build graph once at startup
-print("="*80)
-print("🎬 NETFLIX MOVIE RECOMMENDER - INITIALIZING")
-print("="*80)
+print("="*80, flush=True)
+print("🎬 NETFLIX MOVIE RECOMMENDER - INITIALIZING", flush=True)
+print("="*80, flush=True)
+
+import psutil
+process = psutil.Process(os.getpid())
+print(f"[DEBUG] Initial memory: {process.memory_info().rss / 1024 / 1024:.1f} MB", flush=True)
 
 RATINGS_PATH = "res/ratings_netflix.csv"
 MOVIES_PATH = "res/movies_netflix.csv"
 
-print("\n[1/5] 📂 Loading data...")
+print("\n[1/5] 📂 Loading data...", flush=True)
 RATINGS_DF, MOVIES_DF = graph_mod.load_data(RATINGS_PATH, MOVIES_PATH)
-print(f"      ✓ Loaded {len(RATINGS_DF):,} ratings and {len(MOVIES_DF):,} movies")
+print(f"      ✓ Loaded {len(RATINGS_DF):,} ratings and {len(MOVIES_DF):,} movies", flush=True)
+print(f"[DEBUG] Memory after load: {process.memory_info().rss / 1024 / 1024:.1f} MB", flush=True)
 
-print("\n[2/5] 👥 Filtering users (min 10 ratings ≥3.5)...")
+print("\n[2/5] 👥 Filtering users (min 10 ratings ≥3.5)...", flush=True)
 RATINGS_FILTERED = graph_mod.downsample_users(RATINGS_DF, min_likes=10, threshold=3.5, sample_n=None)
-print(f"      ✓ Filtered to {len(RATINGS_FILTERED):,} positive ratings")
+print(f"      ✓ Filtered to {len(RATINGS_FILTERED):,} positive ratings", flush=True)
+print(f"[DEBUG] Memory after filter: {process.memory_info().rss / 1024 / 1024:.1f} MB", flush=True)
 
 print("\n[3/5] 🔗 Building bipartite graph...")
 G, MAPPINGS = graph_mod.build_bipartite_graph(RATINGS_FILTERED, MOVIES_DF, threshold=3.5)
