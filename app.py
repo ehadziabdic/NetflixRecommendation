@@ -11,7 +11,6 @@ app = Flask(__name__)
 # Use environment variable for secret key in production
 app.secret_key = os.environ.get('SECRET_KEY', 'dev_key_change_in_production')
 
-
 # Load data and build graph once at startup
 print("="*80)
 print("🎬 NETFLIX MOVIE RECOMMENDER - INITIALIZING")
@@ -51,11 +50,12 @@ MOVIE_LIKERS_CACHE = {}
 for m_node in MOVIE_NODES:
     MOVIE_LIKERS_CACHE[m_node] = {nbr for nbr in G.neighbors(m_node) if G.nodes[nbr].get("bipartite") == "user"}
 
+# RATINGS CACHE DISABLED FOR MEMORY OPTIMIZATION
 # Cache: (movie_id, user_id) -> rating for O(1) lookups
-print("      - Building ratings lookup cache...")
-RATINGS_LOOKUP = {}
-for _, row in RATINGS_DF.iterrows():
-    RATINGS_LOOKUP[(int(row['movieId']), int(row['userId']))] = float(row['rating'])
+# print("      - Building ratings lookup cache...")
+# RATINGS_LOOKUP = {}
+# for _, row in RATINGS_DF.iterrows():
+#     RATINGS_LOOKUP[(int(row['movieId']), int(row['userId']))] = float(row['rating'])
 
 # Cache: movie_node -> genres set for faster filtering
 print("      - Building genres cache...")
@@ -67,7 +67,7 @@ for m_node in MOVIE_NODES:
     else:
         MOVIE_GENRES_CACHE[m_node] = set()
 
-print(f"      ✓ Caches built: {len(MOVIE_LIKERS_CACHE):,} movies, {len(RATINGS_LOOKUP):,} rating lookups")
+print(f"      ✓ Caches built: {len(MOVIE_LIKERS_CACHE):,} movies (ratings cache disabled)")
 
 print("\n[5/5] 🎯 Preparing movie and genre lists...")
 print(f"      ✓ Ready to serve recommendations!\n")
@@ -211,12 +211,11 @@ def get_recommendations_for_liked_movies(
         if movie_id and intersection:
             supporter_ids = [MAPPINGS["node_to_user_id"][u] for u in intersection if u in MAPPINGS["node_to_user_id"]]
             
-            # Use O(1) cache lookup for ratings
-            ratings = [RATINGS_LOOKUP.get((movie_id, uid)) for uid in supporter_ids]
-            ratings = [r for r in ratings if r is not None]
+            # Use DataFrame filtering (ratings cache disabled for memory)
+            rows = RATINGS_DF[(RATINGS_DF["movieId"] == movie_id) & (RATINGS_DF["userId"].isin(supporter_ids))]
             
-            if ratings:
-                avg_rating = sum(ratings) / len(ratings)
+            if not rows.empty:
+                avg_rating = float(rows["rating"].mean())
         
         # Apply rating limit filter
         if rating_limit > 0.0 and (avg_rating is None or avg_rating < rating_limit):
