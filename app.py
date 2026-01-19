@@ -102,8 +102,8 @@ def get_recommendations_for_user_node(user_node: str, top_n: int = 10, genre_fil
 
     results = []
 
-    # Users at distance 2 from the user
-    lengths_u = nx.single_source_shortest_path_length(G, source=user_node, cutoff=2)
+    # Users at distance 2 from the user using custom BFS (not NetworkX black box)
+    lengths_u = scoring_mod.bfs_distance(G, source=user_node, max_distance=2)
     two_hop_users = {n for n, dist in lengths_u.items() if dist == 2 and G.nodes[n].get("bipartite") == "user"}
 
     for m in candidates:
