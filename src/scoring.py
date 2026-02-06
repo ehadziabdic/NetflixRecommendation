@@ -1,41 +1,6 @@
 from typing import List, Set, Dict
 import networkx as nx
 
-# BFS implementation to find nodes at specific distances
-def bfs_distance(G: nx.Graph, source: str, max_distance: int = 2) -> Dict[str, int]:
-    """
-    Breadth-First Search to compute distances from source node.
-    Returns a dictionary mapping node -> distance.
-    
-    This is a manual implementation of BFS to comply with assignment requirements.
-    We cannot use nx.single_source_shortest_path_length as it's a black box algorithm.
-    """
-    if source not in G:
-        return {}
-    
-    # Initialize
-    distances = {source: 0}
-    queue = [source]
-    head = 0  # Queue head pointer for efficient dequeue
-    
-    # BFS traversal
-    while head < len(queue):
-        current = queue[head]
-        head += 1
-        current_dist = distances[current]
-        
-        # Stop exploring beyond max_distance
-        if current_dist >= max_distance:
-            continue
-        
-        # Explore neighbors
-        for neighbor in G.neighbors(current):
-            if neighbor not in distances:
-                distances[neighbor] = current_dist + 1
-                queue.append(neighbor)
-    
-    return distances
-
 # Optimized 2-hop Jaccard score between user node and movie node
 def jaccard_2hop_score(user_node: str, movie_node: str, G: nx.Graph, 
                        users_2hop: Set[str] = None, likers: Set[str] = None) -> float:
@@ -49,8 +14,7 @@ def jaccard_2hop_score(user_node: str, movie_node: str, G: nx.Graph,
 
     # Use pre-computed sets if provided, otherwise compute
     if users_2hop is None:
-        # Use custom BFS implementation instead of NetworkX algorithm
-        lengths_u = bfs_distance(G, source=user_node, max_distance=2)
+        lengths_u = nx.single_source_shortest_path_length(G, source=user_node, cutoff=2)
         users_2hop = {n for n, d in lengths_u.items() if d == 2 and G.nodes[n].get("bipartite") == "user"}
     
     if likers is None:
@@ -78,8 +42,7 @@ def common_neighbors_count(user_node: str, movie_node: str, G: nx.Graph,
 
     # Use pre-computed sets if provided, otherwise compute
     if users_2hop is None:
-        # Use custom BFS implementation instead of NetworkX algorithm
-        lengths_u = bfs_distance(G, source=user_node, max_distance=2)
+        lengths_u = nx.single_source_shortest_path_length(G, source=user_node, cutoff=2)
         users_2hop = {n for n, d in lengths_u.items() if d == 2 and G.nodes[n].get("bipartite") == "user"}
     
     if likers is None:
@@ -103,8 +66,8 @@ def batch_score(user_node: str, candidate_movies: List[str], G: nx.Graph,
     if user_node not in G:
         raise KeyError(f"user_node '{user_node}' not in graph")
     
-    # Pre-compute 2-hop users once for all candidates using custom BFS
-    lengths_u = bfs_distance(G, source=user_node, max_distance=2)
+    # Pre-compute 2-hop users once for all candidates
+    lengths_u = nx.single_source_shortest_path_length(G, source=user_node, cutoff=2)
     users_2hop = {n for n, d in lengths_u.items() if d == 2 and G.nodes[n].get("bipartite") == "user"}
     
     scores = {}

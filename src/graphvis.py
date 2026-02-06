@@ -3,60 +3,6 @@ import plotly.graph_objects as go
 import networkx as nx
 from typing import List, Dict, Any, Tuple
 
-def custom_bipartite_layout(G, nodes_left: List[str], align: str = 'vertical', scale: float = 2) -> Dict[str, Tuple[float, float]]:
-    """
-    Custom bipartite layout algorithm implementation.
-    
-    This replaces nx.bipartite_layout to comply with assignment requirements.
-    We cannot use NetworkX's layout algorithms as they are black box computations.
-    
-    Args:
-        G: NetworkX graph
-        nodes_left: List of nodes to place on the left side (or top if vertical)
-        align: 'vertical' or 'horizontal' layout orientation
-        scale: Scaling factor for positions
-        
-    Returns:
-        Dictionary mapping node -> (x, y) position
-    """
-    # Separate nodes into two sets
-    left_set = set(nodes_left)
-    right_set = set(G.nodes()) - left_set
-    
-    left_nodes = list(left_set)
-    right_nodes = list(right_set)
-    
-    pos = {}
-    
-    if align == 'vertical':
-        # Left nodes on top, right nodes on bottom
-        # Distribute left nodes horizontally
-        for i, node in enumerate(left_nodes):
-            x = (i - len(left_nodes) / 2) * scale
-            y = scale
-            pos[node] = (x, y)
-        
-        # Distribute right nodes horizontally
-        for i, node in enumerate(right_nodes):
-            x = (i - len(right_nodes) / 2) * scale
-            y = -scale
-            pos[node] = (x, y)
-    else:
-        # Left nodes on left, right nodes on right
-        # Distribute left nodes vertically
-        for i, node in enumerate(left_nodes):
-            x = -scale
-            y = (i - len(left_nodes) / 2) * scale
-            pos[node] = (x, y)
-        
-        # Distribute right nodes vertically
-        for i, node in enumerate(right_nodes):
-            x = scale
-            y = (i - len(right_nodes) / 2) * scale
-            pos[node] = (x, y)
-    
-    return pos
-
 def create_bipartite_graph(
     G,
     mappings: Dict[str, Dict],
@@ -141,11 +87,11 @@ def create_bipartite_graph(
             if m in G and G.has_edge(u, m):
                 viz_graph.add_edge(u, m)
     
-    # Create bipartite layout using custom algorithm (not NetworkX black box)
+    # Create bipartite layout
     all_user_nodes = [virtual_user] + similar_user_nodes
     all_movie_nodes = liked_movie_nodes + recommended_movie_nodes
     
-    pos = custom_bipartite_layout(viz_graph, all_user_nodes, align='vertical', scale=2)
+    pos = nx.bipartite_layout(viz_graph, all_user_nodes, align='vertical', scale=2)
     
     # Prepare Plotly traces
     edge_trace = []

@@ -143,3 +143,37 @@ def validate_graph(G: nx.Graph) -> None:
         bv = G.nodes[v].get("bipartite")
         if bu == bv:
             raise AssertionError(f"Edge between same partition: {u}({bu}) - {v}({bv})")
+
+
+# Precompute movie likers cache for performance
+def precompute_movie_likers(G: nx.Graph) -> Dict[str, set]:
+    cache = {}
+    movie_nodes = [n for n, d in G.nodes(data=True) if d.get("bipartite") == "movie"]
+    for m_node in movie_nodes:
+        cache[m_node] = {nbr for nbr in G.neighbors(m_node) if G.nodes[nbr].get("bipartite") == "user"}
+    return cache
+
+
+# Precompute movie genres cache
+def precompute_movie_genres(G: nx.Graph) -> Dict[str, set]:
+    cache = {}
+    movie_nodes = [n for n, d in G.nodes(data=True) if d.get("bipartite") == "movie"]
+    for m_node in movie_nodes:
+        genres_str = G.nodes[m_node].get("genres")
+        if genres_str:
+            cache[m_node] = set(str(genres_str).split('|'))
+        else:
+            cache[m_node] = set()
+    return cache
+
+
+# Build memory-efficient ratings lookup (only for filtered users)
+def precompute_ratings_lookup(ratings_df: pd.DataFrame) -> Dict[int, Dict[int, float]]:
+    print("      - Building ratings lookup cache...", flush=True)
+    ratings_lookup = {}
+    
+    for user_id in ratings_df['userId'].unique():
+        user_ratings = ratings_df[ratings_df['userId'] == user_id]
+        ratings_lookup[user_id] = dict(zip(user_ratings['movieId'], user_ratings['rating']))
+    
+    return ratings_lookup

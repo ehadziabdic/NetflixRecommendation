@@ -1,4 +1,5 @@
 import os
+import sys
 import networkx as nx
 from typing import List, Dict, Any, Optional
 from flask import Flask, render_template, request, session
@@ -7,67 +8,71 @@ from src import graph as graph_mod
 from src import scoring as scoring_mod
 from src import graphvis
 
+# Force stdout/stderr to flush immediately for debugging
+sys.stdout.reconfigure(line_buffering=True)
+sys.stderr.reconfigure(line_buffering=True)
+
 app = Flask(__name__)
 # Use environment variable for secret key in production
 app.secret_key = os.environ.get('SECRET_KEY', 'dev_key_change_in_production')
 
+print("[DEBUG] Flask app created", flush=True)
 
 # Load data and build graph once at startup
-print("="*80)
-print("🎬 NETFLIX MOVIE RECOMMENDER - INITIALIZING")
-print("="*80)
+print("="*80, flush=True)
+print("🎬 NETFLIX MOVIE RECOMMENDER - INITIALIZING", flush=True)
+print("="*80, flush=True)
+
+import psutil
+process = psutil.Process(os.getpid())
+print(f"[DEBUG] Initial memory: {process.memory_info().rss / 1024 / 1024:.1f} MB", flush=True)
 
 RATINGS_PATH = "res/ratings_netflix.csv"
 MOVIES_PATH = "res/movies_netflix.csv"
 
-print("\n[1/5] 📂 Loading data...")
+print("\n[1/5] 📂 Loading data...", flush=True)
 RATINGS_DF, MOVIES_DF = graph_mod.load_data(RATINGS_PATH, MOVIES_PATH)
-print(f"      ✓ Loaded {len(RATINGS_DF):,} ratings and {len(MOVIES_DF):,} movies")
+print(f"      ✓ Loaded {len(RATINGS_DF):,} ratings and {len(MOVIES_DF):,} movies", flush=True)
+print(f"[DEBUG] Memory after load: {process.memory_info().rss / 1024 / 1024:.1f} MB", flush=True)
 
-print("\n[2/5] 👥 Filtering users (min 10 ratings ≥3.5)...")
+print("\n[2/5] 👥 Filtering users (min 10 ratings ≥3.5)...", flush=True)
 RATINGS_FILTERED = graph_mod.downsample_users(RATINGS_DF, min_likes=10, threshold=3.5, sample_n=None)
-print(f"      ✓ Filtered to {len(RATINGS_FILTERED):,} positive ratings")
+print(f"      ✓ Filtered to {len(RATINGS_FILTERED):,} positive ratings", flush=True)
+print(f"[DEBUG] Memory after filter: {process.memory_info().rss / 1024 / 1024:.1f} MB", flush=True)
 
 print("\n[3/5] 🔗 Building bipartite graph...")
 G, MAPPINGS = graph_mod.build_bipartite_graph(RATINGS_FILTERED, MOVIES_DF, threshold=3.5)
 print(f"      ✓ Graph created with {G.number_of_nodes():,} nodes and {G.number_of_edges():,} edges")
 graph_mod.validate_graph(G)
 
-# Free memory: delete filtered ratings and movies DataFrames (no longer needed)
+# Free memory: delete filtered ratings DataFrame (no longer needed)
 del RATINGS_FILTERED
 import gc
 gc.collect()
-print("      ✓ Freed memory from unused DataFrames")
+print("      ✓ Freed memory from filtered DataFrame", flush=True)
+print(f"[DEBUG] Memory after cleanup: {process.memory_info().rss / 1024 / 1024:.1f} MB", flush=True)
 
 # Prepare lists for form selects
 USER_NODES = [n for n, d in G.nodes(data=True) if d.get("bipartite") == "user"]
 MOVIE_NODES = [n for n, d in G.nodes(data=True) if d.get("bipartite") == "movie"]
 
-print("\n[4/5] ⚡ Building performance caches...")
+print("\n[4/5] ⚡ Building performance caches...", flush=True)
 
 # Cache: movie_node -> set of user nodes who liked it
-print("      - Building movie likers cache...")
-MOVIE_LIKERS_CACHE = {}
-for m_node in MOVIE_NODES:
-    MOVIE_LIKERS_CACHE[m_node] = {nbr for nbr in G.neighbors(m_node) if G.nodes[nbr].get("bipartite") == "user"}
-
-# Cache: (movie_id, user_id) -> rating for O(1) lookups
-print("      - Building ratings lookup cache...")
-RATINGS_LOOKUP = {}
-for _, row in RATINGS_DF.iterrows():
-    RATINGS_LOOKUP[(int(row['movieId']), int(row['userId']))] = float(row['rating'])
+print("      - Building movie likers cache...", flush=True)
+MOVIE_LIKERS_CACHE = graph_mod.precompute_movie_likers(G)
+print(f"      ✓ Cached likers for {len(MOVIE_LIKERS_CACHE):,} movies", flush=True)
 
 # Cache: movie_node -> genres set for faster filtering
-print("      - Building genres cache...")
-MOVIE_GENRES_CACHE = {}
-for m_node in MOVIE_NODES:
-    genres_str = G.nodes[m_node].get("genres")
-    if genres_str:
-        MOVIE_GENRES_CACHE[m_node] = set(str(genres_str).split('|'))
-    else:
-        MOVIE_GENRES_CACHE[m_node] = set()
+print("      - Building genres cache...", flush=True)
+MOVIE_GENRES_CACHE = graph_mod.precompute_movie_genres(G)
+print(f"      ✓ Cached genres for {len(MOVIE_GENRES_CACHE):,} movies", flush=True)
 
-print(f"      ✓ Caches built: {len(MOVIE_LIKERS_CACHE):,} movies, {len(RATINGS_LOOKUP):,} rating lookups")
+# Cache: userId -> {movieId: rating} for fast lookups
+RATINGS_LOOKUP = graph_mod.precompute_ratings_lookup(RATINGS_DF)
+print(f"      ✓ Cached ratings for {len(RATINGS_LOOKUP):,} users", flush=True)
+
+print(f"[DEBUG] Memory after caches: {process.memory_info().rss / 1024 / 1024:.1f} MB", flush=True)
 
 print("\n[5/5] 🎯 Preparing movie and genre lists...")
 print(f"      ✓ Ready to serve recommendations!\n")
@@ -102,8 +107,8 @@ def get_recommendations_for_user_node(user_node: str, top_n: int = 10, genre_fil
 
     results = []
 
-    # Users at distance 2 from the user using custom BFS (not NetworkX black box)
-    lengths_u = scoring_mod.bfs_distance(G, source=user_node, max_distance=2)
+    # Users at distance 2 from the user
+    lengths_u = nx.single_source_shortest_path_length(G, source=user_node, cutoff=2)
     two_hop_users = {n for n, dist in lengths_u.items() if dist == 2 and G.nodes[n].get("bipartite") == "user"}
 
     for m in candidates:
@@ -211,12 +216,14 @@ def get_recommendations_for_liked_movies(
         if movie_id and intersection:
             supporter_ids = [MAPPINGS["node_to_user_id"][u] for u in intersection if u in MAPPINGS["node_to_user_id"]]
             
-            # Use O(1) cache lookup for ratings
-            ratings = [RATINGS_LOOKUP.get((movie_id, uid)) for uid in supporter_ids]
-            ratings = [r for r in ratings if r is not None]
+            # Use memory-efficient ratings cache
+            ratings_list = []
+            for uid in supporter_ids:
+                if uid in RATINGS_LOOKUP and movie_id in RATINGS_LOOKUP[uid]:
+                    ratings_list.append(RATINGS_LOOKUP[uid][movie_id])
             
-            if ratings:
-                avg_rating = sum(ratings) / len(ratings)
+            if ratings_list:
+                avg_rating = sum(ratings_list) / len(ratings_list)
         
         # Apply rating limit filter
         if rating_limit > 0.0 and (avg_rating is None or avg_rating < rating_limit):
