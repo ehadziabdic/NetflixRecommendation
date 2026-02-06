@@ -145,7 +145,7 @@ def get_recommendations_for_user_node(user_node: str, top_n: int = 10, genre_fil
     return results[:top_n]
 
 
-# Recommend movies for a given user node or liked movies (OPTIMIZED)
+# Recommend movies for a given user node or liked movies
 def get_recommendations_for_liked_movies(
     liked_movie_ids: List[int], 
     top_n: int = 10, 

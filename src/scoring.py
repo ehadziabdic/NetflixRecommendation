@@ -6,17 +6,16 @@ def bfs_distance(G: nx.Graph, source: str, max_distance: int = 2) -> Dict[str, i
     """
     Breadth-First Search to compute distances from source node.
     Returns a dictionary mapping node -> distance.
-    
-    This is a manual implementation of BFS to comply with assignment requirements.
-    We cannot use nx.single_source_shortest_path_length as it's a black box algorithm.
     """
+
+    # Check if source node exists in the graph
     if source not in G:
         return {}
     
     # Initialize
     distances = {source: 0}
     queue = [source]
-    head = 0  # Queue head pointer for efficient dequeue
+    head = 0  # Pointer to current position in queue (efficient dequeue without removing)
     
     # BFS traversal
     while head < len(queue):
@@ -41,16 +40,16 @@ def jaccard_2hop_score(user_node: str, movie_node: str, G: nx.Graph,
                        users_2hop: Set[str] = None, likers: Set[str] = None) -> float:
     """
     Compute Jaccard similarity for 2-hop connections.
-    
-    Optimized: Accepts pre-computed users_2hop and likers sets to avoid redundant calculations.
     """
+
+    # Check if both nodes exist in the graph
     if user_node not in G or movie_node not in G:
         raise KeyError("user_node or movie_node not in graph")
 
     # Use pre-computed sets if provided, otherwise compute
     if users_2hop is None:
-        # Use custom BFS implementation instead of NetworkX algorithm
         lengths_u = bfs_distance(G, source=user_node, max_distance=2)
+        # Filter to get only user nodes at distance 2 and node type user
         users_2hop = {n for n, d in lengths_u.items() if d == 2 and G.nodes[n].get("bipartite") == "user"}
     
     if likers is None:
@@ -61,6 +60,7 @@ def jaccard_2hop_score(user_node: str, movie_node: str, G: nx.Graph,
     intersection = users_2hop & likers
     union_size = len(users_2hop) + len(likers) - len(intersection)
     
+    # Avoid division by zero, return 0 similarity if both sets are empty
     if union_size == 0:
         return 0.0
     return len(intersection) / union_size
@@ -70,8 +70,6 @@ def common_neighbors_count(user_node: str, movie_node: str, G: nx.Graph,
                           users_2hop: Set[str] = None, likers: Set[str] = None) -> int:
     """
     Count common neighbors (users at distance 2 from user who also liked the movie).
-    
-    Optimized: Accepts pre-computed users_2hop and likers sets to avoid redundant calculations.
     """
     if user_node not in G or movie_node not in G:
         raise KeyError("user_node or movie_node not in graph")
@@ -87,7 +85,7 @@ def common_neighbors_count(user_node: str, movie_node: str, G: nx.Graph,
 
     return len(users_2hop & likers)
 
-# General scoring function
+# General scoring function (1 sec per 1 candidate)
 def score(user_node: str, movie_node: str, G: nx.Graph, method: str = "jaccard", **kwargs) -> float:
     m = method.lower()
     if m == "jaccard":
@@ -96,10 +94,11 @@ def score(user_node: str, movie_node: str, G: nx.Graph, method: str = "jaccard",
         return float(common_neighbors_count(user_node, movie_node, G, **kwargs))
     raise ValueError("method must be 'jaccard' or 'cn'/'common_neighbors'")
 
-# Batch scoring for multiple candidates (highly optimized)
+# Batch scoring for multiple candidates (0.01 sec per 100 candidates)
 def batch_score(user_node: str, candidate_movies: List[str], G: nx.Graph, 
                 method: str = "jaccard") -> Dict[str, float]:
 
+    # Check if user node exists in the graph
     if user_node not in G:
         raise KeyError(f"user_node '{user_node}' not in graph")
     

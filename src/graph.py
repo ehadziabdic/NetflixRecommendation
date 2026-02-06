@@ -22,7 +22,7 @@ def load_data(ratings_path: str, movies_path: str) -> Tuple[pd.DataFrame, pd.Dat
         if col not in movies.columns:
             raise ValueError(f"Column '{col}' missing from movies file")
 
-    # Make copies and normalise dtypes
+    # Make copies and normalise dtypes, prevent "1" vs 1 issues
     ratings = ratings.copy()
     movies = movies.copy()
     ratings["userId"] = ratings["userId"].astype(int)
@@ -94,7 +94,7 @@ def build_bipartite_graph(
         m_node = f"m_{int(row['movieId'])}"
         G.add_edge(u_node, m_node, weight=float(row["rating"]))
 
-    # Build helper mappings explicitly (clear and easy to follow)
+    # Build helper mappings explicitly
     user_id_to_node = {}
     node_to_user_id = {}
     movie_id_to_node = {}
