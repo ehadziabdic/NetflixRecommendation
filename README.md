@@ -1,13 +1,19 @@
-# 🎬 Netflix Movie Recommender
+<div align="center">
 
-A graph-based movie recommendation system only for movies available on Netflix. System uses bipartite graph of users and movies for recommendations.
+![Project Banner](static/icons/favicon.png)
 
-**Academic Project** • Algorithms and Data Structures 2 • Data Science and AI • ETF Sarajevo
+# Netflix Movie Recommender
+
+**A graph-based movie recommendation system only for movies available on Netflix. System uses bipartite graph of users and movies for recommendations.**
+
+Algorithms and Data Structures 2 • Data Science and AI • ETF Sarajevo
 
 ![Python](https://img.shields.io/badge/Python-3.11-blue)
 ![Flask](https://img.shields.io/badge/Flask-3.0-green)
 ![NetworkX](https://img.shields.io/badge/NetworkX-2.8-orange)
 ![License](https://img.shields.io/badge/License-MIT-yellow)
+
+</div>
 
 ---
 
